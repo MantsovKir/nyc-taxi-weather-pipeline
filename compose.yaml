@@ -1,0 +1,26 @@
+services:
+  clickhouse:
+    image: clickhouse/clickhouse-server:26.8
+    container_name: nyc_taxi_clickhouse
+    ports:
+      - "127.0.0.1:8123:8123"
+      - "127.0.0.1:9000:9000"
+    # Docker Compose reads these values from the root .env file by default.
+    environment:
+      CLICKHOUSE_DB: ${CLICKHOUSE_DB:?Set CLICKHOUSE_DB in .env}
+      CLICKHOUSE_USER: ${CLICKHOUSE_USER:?Set CLICKHOUSE_USER in .env}
+      CLICKHOUSE_PASSWORD: ${CLICKHOUSE_PASSWORD:?Set CLICKHOUSE_PASSWORD in .env}
+      CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT: "1"
+    volumes:
+      - clickhouse_data:/var/lib/clickhouse
+      - clickhouse_logs:/var/log/clickhouse-server
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--spider", "http://127.0.0.1:8123/ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+volumes:
+  clickhouse_data:
+  clickhouse_logs:
