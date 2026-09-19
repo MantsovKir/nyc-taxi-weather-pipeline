@@ -1,0 +1,20 @@
+# Read local files and use the existing ClickHouse connection.
+source: LOCAL
+target: NYC_TAXI_CLICKHOUSE
+
+defaults:
+  object: raw_taxi_trips
+  mode: full-refresh # Replace the target table with the complete dataset.
+  source_options:
+    format: parquet # Explicitly read the source as Parquet.
+  target_options:
+    column_casing: snake # Normalize target column names to snake_case.
+
+streams:
+  "data/raw/taxi/*.parquet":
+    single: true # Combine all matching files into one stream.
+
+env:
+  SLING_LOADED_AT_COLUMN: true # Add _sling_loaded_at load timestamp.
+  SLING_STREAM_URL_COLUMN: true # Add _sling_stream_url source file URL.
+  SLING_THREADS: 1 # Use one thread for the combined stream.

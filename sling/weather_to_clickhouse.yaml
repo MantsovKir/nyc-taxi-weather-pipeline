@@ -1,0 +1,21 @@
+# Read local weather files using the existing ClickHouse connection.
+source: LOCAL
+target: NYC_TAXI_CLICKHOUSE
+
+defaults:
+  object: raw_weather
+  mode: full-refresh # Replace the target table with the complete dataset.
+  source_options:
+    format: json # Explicitly read the source as JSON.
+    flatten: false # Preserve nested objects and hourly arrays without expansion.
+  target_options:
+    column_casing: snake # Normalize target column names to snake_case.
+
+streams:
+  "data/raw/weather/*.json":
+    single: true # Combine all matching weather files into one stream.
+
+env:
+  SLING_LOADED_AT_COLUMN: true # Add _sling_loaded_at load timestamp.
+  SLING_STREAM_URL_COLUMN: true # Add _sling_stream_url source file URL.
+  SLING_THREADS: 1 # Use one thread for the combined stream.
