@@ -13,3 +13,5 @@ data/raw/weather/*.csv
 target/
 dbt_packages/
 logs/
+dbt/profiles.yml
+dbt/.user.yml

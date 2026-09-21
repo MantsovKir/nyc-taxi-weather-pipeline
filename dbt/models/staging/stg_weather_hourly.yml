@@ -1,0 +1,65 @@
+version: 2
+
+models:
+  - name: stg_weather_hourly
+    description: >-
+      Expands monthly Open-Meteo JSON payloads from raw_weather into one row per
+      hour using aligned hourly arrays. Preserves weather measurement names and
+      Sling metadata without filtering, aggregating, or deduplicating rows.
+    columns:
+      - name: weather_datetime
+        description: >-
+          Open-Meteo local wall-clock hour parsed as a nullable DateTime64 with
+          precision 0 and UTC timezone to avoid daylight-saving normalization.
+          The value preserves the local clock time for joins to timezone-naive
+          NYC taxi timestamps; it does not represent a converted UTC instant.
+        data_tests:
+          - not_null
+          - unique
+      - name: timezone
+        description: "Original Open-Meteo timezone metadata, America/New_York."
+        data_tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: ['America/New_York']
+      - name: temperature_2m
+        description: "Air temperature at 2 meters above ground in degrees Celsius."
+        data_tests:
+          - not_null
+      - name: apparent_temperature
+        description: "Apparent or feels-like temperature in degrees Celsius."
+        data_tests:
+          - not_null
+      - name: relative_humidity_2m
+        description: "Relative humidity at 2 meters above ground as a percentage."
+        data_tests:
+          - not_null
+      - name: precipitation
+        description: "Hourly total precipitation amount in millimeters."
+        data_tests:
+          - not_null
+      - name: rain
+        description: "Hourly rain amount in millimeters."
+        data_tests:
+          - not_null
+      - name: snowfall
+        description: "Hourly snowfall amount in centimeters."
+        data_tests:
+          - not_null
+      - name: weather_code
+        description: "WMO weather interpretation code describing hourly weather conditions."
+        data_tests:
+          - not_null
+      - name: wind_speed_10m
+        description: "Wind speed at 10 meters above ground in kilometers per hour."
+        data_tests:
+          - not_null
+      - name: wind_gusts_10m
+        description: "Wind gust speed at 10 meters above ground in kilometers per hour."
+        data_tests:
+          - not_null
+      - name: source_file
+        description: "Source file URL from Sling metadata, renamed from _sling_stream_url."
+      - name: sling_loaded_at
+        description: "Load timestamp from Sling metadata, renamed from _sling_loaded_at."

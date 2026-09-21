@@ -1,0 +1,72 @@
+version: 2
+
+models:
+  - name: stg_taxi_trips
+    description: >-
+      Standardizes column names from raw_taxi_trips without filtering,
+      aggregating, or deduplicating rows, preserving the source row count.
+    columns:
+      - name: vendor_id
+        description: "Identifier of the provider that supplied the trip record."
+      - name: pickup_datetime
+        description: >-
+          Date and time when the trip meter was engaged. Some datetime records
+          can fall outside the expected source-file period.
+        data_tests:
+          - not_null
+      - name: dropoff_datetime
+        description: >-
+          Date and time when the trip meter was disengaged. Some datetime records
+          can fall outside the expected source-file period.
+        data_tests:
+          - not_null
+      - name: passenger_count
+        description: "Number of passengers reported for the trip."
+      - name: trip_distance
+        description: "Trip distance in miles reported by the taximeter."
+      - name: ratecode_id
+        description: "Code identifying the rate applied at the end of the trip."
+      - name: store_and_fwd_flag
+        description: "Flag indicating whether the trip record was stored before being forwarded to the provider."
+      - name: pickup_location_id
+        description: "Taxi zone identifier for the pickup location."
+        data_tests:
+          - not_null
+      - name: dropoff_location_id
+        description: "Taxi zone identifier for the dropoff location."
+        data_tests:
+          - not_null
+      - name: payment_type
+        description: "Code indicating how the trip was paid for."
+        data_tests:
+          - accepted_values:
+              arguments:
+                values: [0, 1, 2, 3, 4, 5]
+                quote: false
+      - name: fare_amount
+        description: "Metered fare amount in US dollars."
+      - name: extra
+        description: "Miscellaneous extras and surcharges in US dollars."
+      - name: mta_tax
+        description: "MTA tax amount in US dollars."
+      - name: tip_amount
+        description: "Recorded tip amount in US dollars; cash tips are excluded."
+      - name: tolls_amount
+        description: "Total toll amount in US dollars."
+      - name: improvement_surcharge
+        description: "Improvement surcharge amount in US dollars."
+      - name: total_amount
+        description: >-
+          Total amount charged in US dollars, excluding cash tips. Negative
+          total_amount values are preserved because they may represent disputes,
+          refunds, or corrections.
+      - name: congestion_surcharge
+        description: "Congestion surcharge amount in US dollars."
+      - name: airport_fee
+        description: "Airport fee amount in US dollars."
+      - name: cbd_congestion_fee
+        description: "Central business district congestion fee amount in US dollars."
+      - name: source_file
+        description: "Source file URL from Sling metadata, renamed from _sling_stream_url."
+      - name: sling_loaded_at
+        description: "Load timestamp from Sling metadata, renamed from _sling_loaded_at."

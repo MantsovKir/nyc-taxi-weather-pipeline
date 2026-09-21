@@ -1,0 +1,46 @@
+version: 2
+
+sources:
+  - name: raw
+    schema: "{{ env_var('CLICKHOUSE_DB') }}"
+    description: "Raw NYC taxi and weather data loaded into ClickHouse by Sling."
+    tables:
+      - name: raw_taxi_trips
+        description: "Raw NYC yellow taxi trip records."
+        columns:
+          - name: vendor_id
+            description: "Identifier of the provider that supplied the trip record."
+          - name: tpep_pickup_datetime
+            description: "Date and time when the trip meter was engaged."
+          - name: tpep_dropoff_datetime
+            description: "Date and time when the trip meter was disengaged."
+          - name: passenger_count
+            description: "Number of passengers reported for the trip."
+          - name: trip_distance
+            description: "Trip distance in miles reported by the taximeter."
+          - name: pulocation_id
+            description: "Taxi zone identifier for the pickup location."
+          - name: dolocation_id
+            description: "Taxi zone identifier for the dropoff location."
+          - name: payment_type
+            description: "Code indicating how the trip was paid for."
+          - name: fare_amount
+            description: "Metered fare amount in US dollars."
+          - name: tip_amount
+            description: "Recorded tip amount in US dollars; cash tips are excluded."
+          - name: total_amount
+            description: "Total amount charged in US dollars, excluding cash tips."
+          - name: _sling_stream_url
+            description: "Source file URL recorded by Sling."
+          - name: _sling_loaded_at
+            description: "Load timestamp recorded by Sling."
+
+      - name: raw_weather
+        description: "Raw weather JSON records with nested data preserved."
+        columns:
+          - name: data
+            description: "Raw weather JSON payload, including nested objects and hourly arrays."
+          - name: _sling_stream_url
+            description: "Source file URL recorded by Sling."
+          - name: _sling_loaded_at
+            description: "Load timestamp recorded by Sling."

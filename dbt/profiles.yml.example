@@ -1,0 +1,12 @@
+nyc_taxi_weather:
+  target: dev
+  outputs:
+    dev:
+      type: clickhouse
+      host: 127.0.0.1
+      port: 8123
+      schema: "{{ env_var('CLICKHOUSE_DB') }}"
+      user: "{{ env_var('CLICKHOUSE_USER') }}"
+      password: "{{ env_var('CLICKHOUSE_PASSWORD') }}"
+      secure: false
+      threads: 2
