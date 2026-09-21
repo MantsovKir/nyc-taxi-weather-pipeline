@@ -1,0 +1,48 @@
+version: 2
+
+models:
+  - name: int_taxi_hourly
+    description: >-
+      Aggregates retained taxi records at a grain of exactly one row per
+      pickup_hour. Retains counts of valid, invalid, and suspicious taxi records,
+      while passenger, distance, duration, and monetary metrics use valid trips
+      only. Quality counts can overlap. Distance and duration sums support
+      weighted averages at daily and monthly levels using valid trip counts.
+    columns:
+      - name: pickup_hour
+        description: "Pickup hour identifying the single aggregate row for that hour."
+        data_tests:
+          - not_null
+          - unique
+      - name: total_trip_records
+        description: "Count of all retained taxi records in the pickup hour."
+      - name: valid_trip_count
+        description: "Count of records with is_valid_trip equal to 1."
+      - name: invalid_trip_count
+        description: "Count of records with is_valid_trip equal to 0."
+      - name: invalid_duration_count
+        description: "Count of records failing the positive duration and at most 240 minutes rules."
+      - name: zero_distance_count
+        description: "Count of records with a trip distance of zero."
+      - name: extreme_distance_count
+        description: "Count of records with a trip distance greater than 100 miles."
+      - name: missing_passenger_count
+        description: "Count of records with a null passenger count, regardless of trip validity."
+      - name: refund_or_correction_count
+        description: "Count of records with a negative fare amount or total amount."
+      - name: total_passengers
+        description: "Sum of passenger counts for valid trips, treating null passenger counts as zero."
+      - name: total_valid_distance
+        description: "Sum of trip distance in miles for valid trips, retained for weighted averages across hours."
+      - name: total_valid_duration_minutes
+        description: "Sum of trip duration in minutes for valid trips, retained for weighted averages across hours."
+      - name: avg_trip_distance
+        description: "Unrounded average trip distance in miles for valid trips within the hour."
+      - name: avg_trip_duration_minutes
+        description: "Unrounded average trip duration in minutes for valid trips within the hour."
+      - name: total_revenue
+        description: "Sum of total amount in US dollars for valid trips."
+      - name: avg_trip_amount
+        description: "Unrounded average total amount in US dollars for valid trips within the hour."
+      - name: total_tip_amount
+        description: "Sum of tip amount in US dollars for valid trips; negative tips from corrections are preserved."

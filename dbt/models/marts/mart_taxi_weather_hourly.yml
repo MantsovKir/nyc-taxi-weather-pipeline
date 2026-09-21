@@ -1,0 +1,101 @@
+version: 2
+
+models:
+  - name: mart_taxi_weather_hourly
+    description: >-
+      Combines weather and taxi metrics at a grain of one row per weather hour.
+      Weather provides the complete hourly timeline and taxi metrics are left
+      joined onto it. Taxi counts and sums are zero when an hour has no taxi
+      records, while averages and valid_trip_rate remain null. Suspicious record
+      counts are retained; passenger, distance, duration, and monetary metrics
+      use valid trips only.
+    columns:
+      - name: analysis_hour
+        description: >-
+          Open-Meteo local wall-clock hour stored with UTC timezone without
+          converting the clock value, allowing joins to timezone-naive taxi hours.
+        data_tests:
+          - not_null
+          - unique
+      - name: analysis_date
+        description: "Calendar date of analysis_hour."
+        data_tests:
+          - not_null
+      - name: analysis_month
+        description: "First calendar day of the month containing analysis_hour."
+      - name: analysis_year
+        description: "Calendar year of analysis_hour."
+      - name: analysis_month_number
+        description: "Calendar month number from 1 through 12."
+      - name: day_of_week_number
+        description: "Day of week from 1 for Monday through 7 for Sunday."
+      - name: hour_of_day
+        description: "Local wall-clock hour from 0 through 23."
+      - name: is_weekend
+        description: "Integer flag equal to 1 on Saturday or Sunday; otherwise 0."
+        data_tests:
+          - accepted_values:
+              arguments:
+                values: [0, 1]
+                quote: false
+      - name: timezone
+        description: "Original Open-Meteo timezone metadata, America/New_York."
+      - name: temperature_2m
+        description: "Air temperature at 2 meters above ground in degrees Celsius."
+      - name: apparent_temperature
+        description: "Apparent or feels-like temperature in degrees Celsius."
+      - name: relative_humidity_2m
+        description: "Relative humidity at 2 meters above ground as a percentage."
+      - name: precipitation
+        description: "Hourly total precipitation amount in millimeters."
+      - name: rain
+        description: "Hourly rain amount in millimeters."
+      - name: snowfall
+        description: "Hourly snowfall amount in centimeters."
+      - name: weather_code
+        description: "WMO weather interpretation code describing hourly weather conditions."
+      - name: wind_speed_10m
+        description: "Wind speed at 10 meters above ground in kilometers per hour."
+      - name: wind_gusts_10m
+        description: "Wind gust speed at 10 meters above ground in kilometers per hour."
+      - name: has_taxi_records
+        description: "Integer flag equal to 1 when a matching taxi hourly row exists; otherwise 0."
+        data_tests:
+          - accepted_values:
+              arguments:
+                values: [0, 1]
+                quote: false
+      - name: total_trip_records
+        description: "Count of all retained taxi records in the hour; zero when no taxi row exists."
+      - name: valid_trip_count
+        description: "Count of valid taxi records; zero when no taxi row exists."
+      - name: invalid_trip_count
+        description: "Count of invalid taxi records; zero when no taxi row exists."
+      - name: invalid_duration_count
+        description: "Count of records failing the positive duration and at most 240 minutes rules; zero when no taxi row exists."
+      - name: zero_distance_count
+        description: "Count of records with zero trip distance; zero when no taxi row exists."
+      - name: extreme_distance_count
+        description: "Count of records with trip distance greater than 100 miles; zero when no taxi row exists."
+      - name: missing_passenger_count
+        description: "Count of records with null passenger count, regardless of validity; zero when no taxi row exists."
+      - name: refund_or_correction_count
+        description: "Count of records with negative fare or total amount; zero when no taxi row exists."
+      - name: total_passengers
+        description: "Sum of passengers for valid trips with null passenger counts treated as zero; zero when no taxi row exists."
+      - name: total_valid_distance
+        description: "Sum of valid trip distance in miles for weighted averages across hours; zero when no taxi row exists."
+      - name: total_valid_duration_minutes
+        description: "Sum of valid trip duration in minutes for weighted averages across hours; zero when no taxi row exists."
+      - name: total_revenue
+        description: "Sum of total amount in US dollars for valid trips; zero when no taxi row exists."
+      - name: total_tip_amount
+        description: "Sum of tips in US dollars for valid trips, preserving negative corrections; zero when no taxi row exists."
+      - name: avg_trip_distance
+        description: "Unrounded average distance in miles for valid trips in the hour; null when no taxi row exists."
+      - name: avg_trip_duration_minutes
+        description: "Unrounded average duration in minutes for valid trips in the hour; null when no taxi row exists."
+      - name: avg_trip_amount
+        description: "Unrounded average total amount in US dollars for valid trips in the hour; null when no taxi row exists."
+      - name: valid_trip_rate
+        description: "Unrounded valid trip count divided by total trip records, on a scale from 0 to 1; null when total trip records is zero."

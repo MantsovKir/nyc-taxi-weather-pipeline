@@ -1,0 +1,77 @@
+version: 2
+
+models:
+  - name: int_taxi_trips_clean
+    description: >-
+      Keeps taxi trips with pickup times within the analysis period
+      [2025-01-01, 2026-06-01), preserving one row per retained staging record.
+      Preserves suspicious records using quality flags for later hourly
+      aggregation instead of removing them.
+    columns:
+      - name: pickup_hour
+        description: "Pickup datetime rounded down to the start of the hour."
+        data_tests:
+          - not_null
+      - name: trip_duration_minutes
+        description: "Elapsed seconds between pickup and dropoff divided by 60.0, expressed in minutes."
+      - name: is_valid_duration
+        description: >-
+          Integer flag equal to 1 when dropoff is after pickup and duration is
+          at most 240 minutes; otherwise 0, including missing duration inputs.
+        data_tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: [0, 1]
+                quote: false
+      - name: is_zero_distance
+        description: "Integer flag equal to 1 when trip distance is zero; otherwise 0, including null distances."
+        data_tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: [0, 1]
+                quote: false
+      - name: is_extreme_distance
+        description: "Integer flag equal to 1 when trip distance exceeds 100 miles; otherwise 0, including null distances."
+        data_tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: [0, 1]
+                quote: false
+      - name: is_passenger_count_missing
+        description: >-
+          Integer flag equal to 1 when passenger count is null; otherwise 0.
+          Missing passenger count is informational and does not by itself
+          invalidate a trip.
+        data_tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: [0, 1]
+                quote: false
+      - name: is_refund_or_correction
+        description: >-
+          Integer flag equal to 1 when fare amount or total amount is negative,
+          treating the record as a refund or correction; otherwise 0.
+          Null amounts do not independently trigger this flag.
+        data_tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: [0, 1]
+                quote: false
+      - name: is_valid_trip
+        description: >-
+          Integer flag equal to 1 only when dropoff is after pickup, duration is
+          at most 240 minutes, distance is greater than zero and at most 100
+          miles, and fare amount and total amount are both non-negative.
+          Otherwise 0, including null inputs to these rules. Combines duration,
+          distance, and amount rules without considering passenger count.
+        data_tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: [0, 1]
+                quote: false
