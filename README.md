@@ -2,80 +2,100 @@
 
 ## Project overview
 
-An end-to-end analytics pipeline combining NYC Yellow Taxi trip data with hourly New York weather data. Python downloads monthly source files, Sling loads them into ClickHouse, and dbt transforms them into an analytical mart for exploring taxi demand, revenue, trip quality, and weather conditions by hour.
+An end-to-end data pipeline combining NYC Yellow Taxi trips with hourly weather data. Python downloads the source files, Sling loads them into ClickHouse, and dbt prepares hourly datasets for analysis.
 
-The project currently covers **January 2025 through May 2026**. Taxi data comes from the NYC TLC Yellow Taxi Parquet dataset; weather comes from the Open-Meteo historical weather API for New York City.
+The project covers January 2025 through May 2026. Taxi trips come from the NYC Taxi and Limousine Commission (TLC); weather comes from the Open-Meteo historical weather API.
+
+The planned Power BI dashboard will show citywide taxi activity and trip validity, then allow users to select an hour and pickup zone to explore the most common destinations on a map and in a table. Weather is represented by one hourly series for New York City and does not change when a taxi zone is selected.
 
 ## Architecture
 
 ```mermaid
 flowchart LR
-    T[NYC TLC Yellow Taxi Parquet] --> P[Python download scripts]
-    W[Open-Meteo weather API] --> P
-    P --> F[Local Parquet and monthly JSON files]
-    F --> S[Sling loading]
-    S --> RT[ClickHouse: raw_taxi_trips]
-    S --> RW[ClickHouse: raw_weather]
-    RT --> ST[dbt: stg_taxi_trips]
-    RW --> SW[dbt: stg_weather_hourly]
-    ST --> CT[dbt: int_taxi_trips_clean]
-    CT --> HT[dbt: int_taxi_hourly]
-    SW --> M[mart_taxi_weather_hourly]
-    HT --> M
-    M -.-> BI[BI / analytics: planned]
+    T[NYC TLC taxi trips] --> P[Python downloads]
+    W[Open-Meteo weather] --> P
+    P --> S[Sling]
+    S --> R[ClickHouse raw tables]
+    R --> D[dbt staging and intermediate]
+    D --> C[Citywide hourly mart]
+    D --> Z[Hourly routes mart]
+    C --> BI[Power BI planned]
+    Z --> BI
 ```
 
-Docker Compose runs ClickHouse with persistent storage. `uv` manages the Python environment and dbt dependencies. Transformations execute in ClickHouse; staging and intermediate models are views, and the final mart is a `MergeTree` table.
+Docker Compose runs ClickHouse with persistent storage. `uv` manages the Python environment. Staging and intermediate dbt models are views; both analytical marts are ClickHouse `MergeTree` tables.
+
+The taxi zone lookup is loaded as a dbt seed. The routes mart joins it twice: once for the pickup zone and once for the dropoff zone.
 
 ## Data layers
 
 | Relation | Grain | Purpose |
 |---|---|---|
-| `raw_taxi_trips` | One source taxi record | Sling-loaded Parquet records with normalized column names and ingestion metadata. |
-| `raw_weather` | One monthly JSON payload | Preserves nested Open-Meteo hourly arrays in `data`, plus Sling metadata. |
-| `stg_taxi_trips` | One source taxi record | Standardizes column names without filtering or deduplicating rows. |
-| `stg_weather_hourly` | One weather hour | Extracts nine measurements and expands aligned arrays with `arrayZip` and a single `ARRAY JOIN`. |
-| `int_taxi_trips_clean` | One retained taxi record | Keeps pickups in `[2025-01-01, 2026-06-01)` and adds duration, pickup hour, and quality flags. |
-| `int_taxi_hourly` | One pickup hour | Counts all retained records and quality flags; calculates sums and averages for valid trips. |
-| `mart_taxi_weather_hourly` | One weather hour | Left joins taxi metrics onto the complete weather timeline and adds calendar fields and valid-trip rate. |
+| `raw_taxi_trips` | One source taxi record | Taxi Parquet records loaded by Sling, including ingestion metadata. |
+| `raw_weather` | One monthly JSON payload | Open-Meteo hourly arrays loaded by Sling. |
+| `taxi_zone_lookup` | One taxi zone ID | dbt seed with zone, borough, and service zone names. |
+| `stg_taxi_trips` | One source taxi record | Standardizes taxi column names. |
+| `stg_weather_hourly` | One weather hour | Expands the weather arrays into hourly records. |
+| `int_taxi_trips_clean` | One retained taxi record | Keeps pickups in `[2025-01-01, 2026-06-01)` and adds the pickup hour and trip quality flags. |
+| `int_taxi_hourly` | One pickup hour | Aggregates citywide trip counts and metrics. |
+| `mart_taxi_weather_hourly` | One weather hour | Combines the citywide hourly taxi metrics with the weather timeline. |
+| `mart_taxi_routes_hourly` | One pickup hour, pickup zone ID, dropoff zone ID, and validity flag | Counts trips by route and adds pickup and dropoff zone names. |
 
-Weather timestamps preserve Open-Meteo local wall-clock values using a UTC-typed datetime, without converting them into UTC instants. This avoids DST normalization when joining to timezone-naive taxi timestamps; `America/New_York` remains timezone metadata.
+The routes mart keeps valid and invalid trips in separate rows. To calculate the number of trips for a selection, sum `trip_count`; counting rows in the mart would give a different result.
 
-Hourly distance and duration sums support weighted daily or monthly averages: divide the summed metric by the summed valid-trip count rather than averaging hourly averages.
+Weather is one representative hourly series for New York City, not an average of observations from every taxi zone. The citywide weather mart and the routes mart remain separate so weather measurements are not multiplied by the number of routes.
+
+Weather timestamps preserve Open-Meteo local clock values in a UTC-typed column without converting the clock time. This allows them to match the timezone-naive taxi pickup hours; `America/New_York` remains timezone metadata.
 
 ## Data quality
 
-Suspicious records remain available for analysis. A valid trip has dropoff after pickup, duration at most 240 minutes, distance greater than zero and at most 100 miles, and non-negative fare and total amount. Missing passenger count is informational. Negative fares and totals are flagged as refunds or corrections; negative tips are preserved.
+Suspicious taxi records remain available for analysis. A valid trip has dropoff after pickup, duration of at most 240 minutes, distance greater than zero and at most 100 miles, and non-negative fare and total amount. Missing passenger count is informational.
 
-Implemented dbt checks include:
+dbt checks cover required fields, accepted flag values, unique weather hours, hourly metric consistency, and the unique combination of pickup hour, pickup zone ID, dropoff zone ID, and validity in the routes mart.
 
-- Required taxi timestamps and location identifiers, plus accepted payment codes.
-- Unique, non-null weather hours; required weather measurements; expected timezone.
-- Non-null pickup hours and binary quality flags, with uniqueness at hourly grains.
-- Hourly count reconciliation and bounds for valid, invalid, and suspicious-record counts.
-- Mart rate bounds and arithmetic consistency within `0.000000001`, zero counts and sums for missing taxi hours, null averages and rates for those hours, and calendar-field consistency.
-
-The latest verified end-to-end dbt build completed with **`PASS=45, WARN=0, ERROR=0, SKIP=0`**. This is a recorded build result covering models and tests, not a fixed test-count guarantee. Tests do not hardcode the number of hours or reject missing taxi hours during DST transitions.
+The routes mart was checked against `int_taxi_trips_clean`: summing its `trip_count` gives the same **67,721,846** retained trips. A separate SQL test found no duplicate route keys. The column tests for the routes mart also passed.
 
 ## Verified results
 
-Snapshot from the completed build and verification:
-
 | Metric | Result |
 |---|---:|
-| Modeled taxi records | 67,721,846 |
-| Final mart rows | 12,384 |
-| Unique hourly timestamps | 12,384 |
-| Period | 2025-01-01 00:00 through 2026-05-31 23:00 |
-| Hours without taxi records | 2 |
+| Raw taxi records | 67,721,884 |
+| Retained taxi records | 67,721,846 |
 | Valid trips | 62,242,363 |
 | Invalid trips | 5,479,483 |
-| Mart engine | `MergeTree` |
-| Sorting key | `analysis_hour` |
-| Monthly partition key | `toYYYYMM(analysis_hour)` |
-| Current mart size | 2.01 MiB |
+| Citywide weather mart rows | 12,384 |
+| Routes mart rows | 29,451,015 |
+| Trips summed from routes mart | 67,721,846 |
+| Taxi zones in lookup seed | 265 |
+| Taxi zone boundaries available for the map | 263 |
 
-Hours without taxi records retain zero taxi counts and sums, while averages and `valid_trip_rate` remain `NULL`. These hours remain in the weather-based timeline.
+The retained taxi model restricts pickup time to January 2025 through May 2026. The citywide weather timeline includes hours without taxi records; their trip counts are zero.
+
+The routes mart is sorted by pickup hour, pickup location ID, dropoff location ID, and validity, and partitioned by pickup month.
+
+## Taxi zone map
+
+Taxi zone boundaries come from the [NYC TLC trip data page](https://www.nyc.gov/site/tlc/about/tlc-trip-record-data.page). The original Shapefile is stored in `data/references/taxi_zones/`.
+
+The prepared file `data/references/taxi_zones.geojson` contains 263 zone boundaries. Its `location_id` corresponds to the IDs in `dbt/seeds/taxi_zone_lookup.csv` and the routes mart.
+
+To recreate the GeoJSON from the Shapefile, run this command from the repository root when the output file does not already exist:
+
+```bash
+duckdb -c "LOAD spatial;
+SET geometry_always_xy = true;
+COPY (
+    SELECT
+        LocationID AS location_id,
+        zone,
+        borough,
+        ST_Transform(geom, 'EPSG:2263', 'EPSG:4326', true) AS geom
+    FROM ST_Read('data/references/taxi_zones/taxi_zones.shp')
+) TO 'data/references/taxi_zones.geojson'
+WITH (FORMAT GDAL, DRIVER 'GeoJSON', SRS 'EPSG:4326');"
+```
+
+Zone 264 (`Unknown`) and zone 265 (`Outside of NYC`) have no boundaries. Their trips remain in the route data and tables, but these zones cannot be colored on the map.
 
 ## Repository structure
 
@@ -89,7 +109,13 @@ Hours without taxi records retain zero taxi counts and sums, while averages and 
 ├── uv.lock
 ├── data/
 │   └── references/
-│       └── taxi_zone_lookup.csv
+│       ├── taxi_zones/
+│       │   ├── taxi_zones.cpg
+│       │   ├── taxi_zones.dbf
+│       │   ├── taxi_zones.prj
+│       │   ├── taxi_zones.shp
+│       │   └── taxi_zones.shx
+│       └── taxi_zones.geojson
 ├── scripts/
 │   ├── download_taxi_data.py
 │   └── download_weather_data.py
@@ -100,96 +126,77 @@ Hours without taxi records retain zero taxi counts and sums, while averages and 
     ├── README.md
     ├── dbt_project.yml
     ├── profiles.yml.example
+    ├── seeds/
+    │   └── taxi_zone_lookup.csv
     ├── models/
     │   ├── staging/
-    │   │   ├── sources.yml
-    │   │   ├── stg_taxi_trips.sql
-    │   │   ├── stg_taxi_trips.yml
-    │   │   ├── stg_weather_hourly.sql
-    │   │   └── stg_weather_hourly.yml
     │   ├── intermediate/
-    │   │   ├── int_taxi_trips_clean.sql
-    │   │   ├── int_taxi_trips_clean.yml
-    │   │   ├── int_taxi_hourly.sql
-    │   │   └── int_taxi_hourly.yml
     │   └── marts/
     │       ├── mart_taxi_weather_hourly.sql
-    │       └── mart_taxi_weather_hourly.yml
+    │       ├── mart_taxi_weather_hourly.yml
+    │       ├── mart_taxi_routes_hourly.sql
+    │       └── mart_taxi_routes_hourly.yml
     └── tests/
         ├── assert_int_taxi_hourly_consistency.sql
-        └── assert_mart_taxi_weather_hourly_consistency.sql
+        ├── assert_mart_taxi_weather_hourly_consistency.sql
+        └── assert_mart_taxi_routes_unique.sql
 ```
 
-The tree omits local source data, credentials, virtual environments, and generated artifacts. The taxi zone lookup is available as reference data; the current models do not join it.
+The tree omits local source data, credentials, virtual environments, and generated dbt artifacts.
 
 ## Setup and execution
 
-Prerequisites: Python 3.12 or newer, `uv`, Docker with Compose, and the Sling CLI. Source downloads require internet access and sufficient local storage for the monthly taxi files. Run commands from the repository root.
+Prerequisites: Python 3.12 or newer, `uv`, Docker with Compose, the Sling CLI, and DuckDB for reproducing the GeoJSON. Run commands from the repository root.
 
-**1. Configure the local environment.** Create local copies without replacing existing configuration:
+### 1. Configure the environment
 
-```sh
+```bash
 cp -n .env.example .env
 cp -n dbt/profiles.yml.example dbt/profiles.yml
 uv sync --locked
 ```
 
-Set `CLICKHOUSE_DB`, `CLICKHOUSE_USER`, and `CLICKHOUSE_PASSWORD` in `.env` to your local values. Keep the environment-variable references in the dbt profile. Both local files are ignored by Git; do not commit credentials.
+Set the ClickHouse database, user, and password in `.env`. Keep credentials out of Git. Export the environment variables before running dbt:
 
-Compose reads `.env` automatically. Export its values for dbt, which does not load that file automatically:
-
-```sh
+```bash
 set -a
 . ./.env
 set +a
 ```
 
-**2. Start ClickHouse.**
+### 2. Start ClickHouse
 
-```sh
+```bash
 docker compose up -d clickhouse
 ```
 
-The service uses ClickHouse 26.8, exposing HTTP on `127.0.0.1:8123` and the native protocol on `127.0.0.1:9000`. The dbt profile uses HTTP with two threads.
+### 3. Download and load the source data
 
-**3. Download the source files.** The scripts cover the configured 17 months and skip files that already exist.
-
-```sh
+```bash
 uv run python scripts/download_taxi_data.py
 uv run python scripts/download_weather_data.py
 ```
 
-**4. Load a fresh database.** Configure a local Sling ClickHouse connection named `NYC_TAXI_CLICKHOUSE` using the same database and credentials. The replication files reference this connection; its definition is not included in the repository.
+Configure a local Sling connection named `NYC_TAXI_CLICKHOUSE` using the ClickHouse credentials. For the initial load into a fresh database:
 
-For the initial load only, when neither raw table exists:
-
-```sh
+```bash
 sling run -r sling/taxi_to_clickhouse.yaml
 sling run -r sling/weather_to_clickhouse.yaml
 ```
 
-The committed replication files use `full-refresh`, which replaces existing target tables. Skip this step when using an already loaded database. Sling records the source file URL and load timestamp, and preserves nested weather JSON for dbt to expand.
+The Sling replication files use full refresh and replace their target tables. Do not repeat this step merely to rebuild the dbt marts.
 
-**5. Build and test the mart and its dependencies.**
+### 4. Load the zone seed and build the marts
 
-```sh
+```bash
+uv run dbt seed --project-dir dbt --profiles-dir dbt --select taxi_zone_lookup
+
 uv run dbt build --project-dir dbt --profiles-dir dbt \
-  --select +mart_taxi_weather_hourly
+  --select +mart_taxi_weather_hourly +mart_taxi_routes_hourly
 ```
 
-## Main technologies
+## Current status and next step
 
-| Technology | Role |
-|---|---|
-| Python | Downloads monthly taxi Parquet files and Open-Meteo weather JSON using the standard library. |
-| Sling | Loads local files into ClickHouse raw tables and adds ingestion metadata. |
-| ClickHouse | Executes transformations and stores the analytical mart in a monthly partitioned `MergeTree` table. |
-| dbt Core + dbt-clickhouse | Defines model dependencies, SQL transformations, documentation, and data-quality tests. |
-| Docker Compose | Runs the local ClickHouse service with persistent data and log volumes. |
-| uv | Manages Python dependencies through `pyproject.toml` and `uv.lock` and runs project commands. |
+The citywide weather mart, hourly routes mart, zone seed, dbt checks, and GeoJSON map boundaries are prepared. The next stage is building the Power BI data model and dashboard.
 
-DuckDB artifacts are excluded by `.gitignore`, but no DuckDB processing step is defined in the committed scripts or configurations.
-
-## Current status / next step
-
-Ingestion, transformation, data-quality testing, and the final analytical mart are complete. The next planned stage is connecting a BI tool and building the dashboard.
+The planned dashboard will provide a citywide overview with a trip validity filter, hourly weather, and a taxi zone map. Selecting a pickup zone will show destination zones colored by trip count and ranked in a table. Before importing the routes mart into Power BI, its size and connection strategy need to be checked: it contains about 29.5 million aggregated rows.

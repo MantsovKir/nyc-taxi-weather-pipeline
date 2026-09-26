@@ -1,0 +1,43 @@
+version: 2
+
+
+
+models:
+  - name: mart_taxi_routes_hourly
+    description: >-
+      One row per pickup hour, pickup zone, dropoff zone, and trip validity.
+      trip_count contains the number of trips in that group.
+
+    columns:
+      - name: pickup_hour
+        description: "Pickup hour in New York local clock time."
+        data_tests:
+          - not_null
+      - name: pickup_location_id
+        description: "Pickup location ID from taxi trip data."
+        data_tests:
+          - not_null
+      - name: pickup_zone
+        description: "Pickup zone name from taxi_zone_lookup."
+        data_tests:
+          - not_null
+      - name: dropoff_location_id
+        description: "Dropoff location ID from taxi trip data."
+        data_tests:
+          - not_null
+      - name: dropoff_zone
+        description: "Dropoff zone name from taxi_zone_lookup."
+        data_tests:
+          - not_null
+      - name: trip_count
+        description: "Count of trips in the group."
+        data_tests:
+          - not_null
+      - name: is_valid_trip
+        description: "Integer flag equal to 1 for valid trips; otherwise 0."
+        data_tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: [0, 1]
+                quote: false
