@@ -85,7 +85,21 @@ The finished Power BI Desktop report contains three pages:
 | **Routes and Weather** | A taxi-zone map, top destinations, a detail table, and trips by hour; pickup zone, pickup hour, and date can be selected. |
 | **Weather & Demand** | Daily trips alongside precipitation, average hourly trips in wet versus dry conditions, and hourly percentage comparisons for weekdays and weekends. |
 
-The report uses the citywide weather mart and routes mart at different grains. Zone selections are for route analysis; the citywide weather series is not zone-specific. The map uses the GeoJSON described below. The Power BI report is currently a local Desktop artifact and is not hosted as a public interactive link.
+The report uses the citywide weather mart and routes mart at different grains. Zone selections are for route analysis; the citywide weather series is not zone-specific. The map uses the GeoJSON described below. The report is a local Power BI Desktop artifact; the [three-page PDF preview](docs/NYC_Taxi_Weather_Dashboard.pdf) can be viewed without Power BI. It is not hosted as a public interactive link.
+
+### Dashboard preview
+
+**Taxi Overview** — January–June 2025, valid trips selected.
+
+![Taxi Overview dashboard page](docs/screenshots/taxi-overview.png)
+
+**Routes and Weather** — January 2025, 15:00 pickup hour, Central Park pickup zone.
+
+![Routes and Weather dashboard page](docs/screenshots/routes-and-weather.png)
+
+**Weather & Demand** — January–June 2025; the chart's zoom slider focuses on part of that period.
+
+![Weather and Demand dashboard page](docs/screenshots/weather-and-demand.png)
 
 ## Taxi zone map
 
@@ -211,4 +225,4 @@ uv run dbt build --project-dir dbt --profiles-dir dbt \
 
 ## Current status
 
-The pipeline, dbt models, checks, GeoJSON map boundaries, and three-page Power BI Desktop report are complete. The routes mart contains about 29.5 million aggregated rows, so it is not a one-row-per-trip table. The report is not published to Power BI Service; the repository documentation and report preview are being prepared for portfolio use.
+The pipeline, dbt models, checks, GeoJSON map boundaries, and three-page Power BI Desktop report are complete. The routes mart contains about 29.5 million aggregated rows, so it is not a one-row-per-trip table. The report is not published to Power BI Service; screenshots and a PDF preview are included for portfolio review.
