@@ -87,6 +87,8 @@ The finished Power BI Desktop report contains three pages:
 
 The report uses the citywide weather mart and routes mart at different grains. Zone selections are for route analysis; the citywide weather series is not zone-specific. The map uses the GeoJSON described below. The report is a local Power BI Desktop artifact; the [three-page PDF preview](docs/NYC_Taxi_Weather_Dashboard.pdf) can be viewed without Power BI. It is not hosted as a public interactive link.
 
+The [Power BI Desktop file](powerbi/NYC_Taxi_Weather_Dashboard.pbix) is included for inspecting the report, model, and measures. Refreshing the report requires access to the local ClickHouse database.
+
 ### Dashboard preview
 
 **Taxi Overview** — January–June 2025, valid trips selected.
