@@ -4,7 +4,9 @@ __pycache__/
 .DS_Store
 
 data/raw/taxi/*.parquet
+data/raw/taxi/*.part
 data/raw/weather/*.json
+data/raw/weather/*.part
 data/raw/weather/*.csv
 
 *.duckdb

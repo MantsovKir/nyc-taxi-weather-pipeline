@@ -6,7 +6,8 @@ models:
   - name: mart_taxi_routes_hourly
     description: >-
       One row per pickup hour, pickup zone, dropoff zone, and trip validity.
-      trip_count contains the number of trips in that group.
+      trip_count contains the number of trips in that group, while
+      total_valid_amount sums amounts for valid trips only.
 
     columns:
       - name: pickup_hour
@@ -31,6 +32,12 @@ models:
           - not_null
       - name: trip_count
         description: "Count of trips in the group."
+        data_tests:
+          - not_null
+      - name: total_valid_amount
+        description: >-
+          Sum of total_amount in US dollars for valid trips in the group,
+          treating null amounts as zero. Zero for invalid trip groups.
         data_tests:
           - not_null
       - name: is_valid_trip

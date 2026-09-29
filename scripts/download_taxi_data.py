@@ -15,13 +15,15 @@ def download_taxi_file(year: int, month: int) -> None:
     filename = f"yellow_tripdata_{year}-{month:02d}.parquet"
     url = f"{BASE_URL}/{filename}"
     output_path = OUTPUT_DIR / filename
+    temporary_path = OUTPUT_DIR / f"{filename}.part"
 
     if output_path.exists():
         print(f"SKIP: {filename} already exists")
         return
 
     print(f"DOWNLOAD: {filename}")
-    urlretrieve(url, output_path)
+    urlretrieve(url, temporary_path)
+    temporary_path.replace(output_path)
     print(f"DONE: {filename}")
 
 

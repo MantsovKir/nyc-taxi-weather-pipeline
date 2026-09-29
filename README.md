@@ -2,11 +2,11 @@
 
 ## Project overview
 
-An end-to-end data pipeline combining NYC Yellow Taxi trips with hourly weather data. Python downloads the source files, Sling loads them into ClickHouse, and dbt prepares hourly datasets for analysis.
+An end-to-end analytics project combining NYC Yellow Taxi trips with hourly weather data. Python downloads the source files, Sling loads them into ClickHouse, dbt prepares hourly datasets, and a three-page Power BI Desktop report explores trip patterns, routes, and weather.
 
 The project covers January 2025 through May 2026. Taxi trips come from the NYC Taxi and Limousine Commission (TLC); weather comes from the Open-Meteo historical weather API.
 
-The planned Power BI dashboard will show citywide taxi activity and trip validity, then allow users to select an hour and pickup zone to explore the most common destinations on a map and in a table. Weather is represented by one hourly series for New York City and does not change when a taxi zone is selected.
+The pipeline loaded **67,721,884** raw trip records. Its citywide hourly mart has **12,384** weather hours, and its routes mart groups retained trips by pickup hour, origin, destination, and trip validity. The [Power BI report](#power-bi-report) uses both marts. Weather is represented by one hourly series for New York City and does not change when a taxi zone is selected.
 
 ## Architecture
 
@@ -19,7 +19,7 @@ flowchart LR
     R --> D[dbt staging and intermediate]
     D --> C[Citywide hourly mart]
     D --> Z[Hourly routes mart]
-    C --> BI[Power BI planned]
+    C --> BI[Power BI Desktop report]
     Z --> BI
 ```
 
@@ -39,9 +39,11 @@ The taxi zone lookup is loaded as a dbt seed. The routes mart joins it twice: on
 | `int_taxi_trips_clean` | One retained taxi record | Keeps pickups in `[2025-01-01, 2026-06-01)` and adds the pickup hour and trip quality flags. |
 | `int_taxi_hourly` | One pickup hour | Aggregates citywide trip counts and metrics. |
 | `mart_taxi_weather_hourly` | One weather hour | Combines the citywide hourly taxi metrics with the weather timeline. |
-| `mart_taxi_routes_hourly` | One pickup hour, pickup zone ID, dropoff zone ID, and validity flag | Counts trips by route and adds pickup and dropoff zone names. |
+| `mart_taxi_routes_hourly` | One pickup hour, pickup zone ID, dropoff zone ID, and validity flag | Counts trips, sums amounts for valid trips, and adds pickup and dropoff zone names. |
 
 The routes mart keeps valid and invalid trips in separate rows. To calculate the number of trips for a selection, sum `trip_count`; counting rows in the mart would give a different result.
+
+The routes mart also stores `total_valid_amount`, the sum of `total_amount` for valid trips in each group. Invalid groups have a value of zero. This supports zone-level monetary measures without treating route rows as individual trips.
 
 Weather is one representative hourly series for New York City, not an average of observations from every taxi zone. The citywide weather mart and the routes mart remain separate so weather measurements are not multiplied by the number of routes.
 
@@ -72,6 +74,18 @@ The routes mart was checked against `int_taxi_trips_clean`: summing its `trip_co
 The retained taxi model restricts pickup time to January 2025 through May 2026. The citywide weather timeline includes hours without taxi records; their trip counts are zero.
 
 The routes mart is sorted by pickup hour, pickup location ID, dropoff location ID, and validity, and partitioned by pickup month.
+
+## Power BI report
+
+The finished Power BI Desktop report contains three pages:
+
+| Page | What it shows |
+|---|---|
+| **Taxi Overview** | Citywide trip volume and quality, with date and validity filters and summary charts. |
+| **Routes and Weather** | A taxi-zone map, top destinations, a detail table, and trips by hour; pickup zone, pickup hour, and date can be selected. |
+| **Weather & Demand** | Daily trips alongside precipitation, average hourly trips in wet versus dry conditions, and hourly percentage comparisons for weekdays and weekends. |
+
+The report uses the citywide weather mart and routes mart at different grains. Zone selections are for route analysis; the citywide weather series is not zone-specific. The map uses the GeoJSON described below. The Power BI report is currently a local Desktop artifact and is not hosted as a public interactive link.
 
 ## Taxi zone map
 
@@ -195,8 +209,6 @@ uv run dbt build --project-dir dbt --profiles-dir dbt \
   --select +mart_taxi_weather_hourly +mart_taxi_routes_hourly
 ```
 
-## Current status and next step
+## Current status
 
-The citywide weather mart, hourly routes mart, zone seed, dbt checks, and GeoJSON map boundaries are prepared. The next stage is building the Power BI data model and dashboard.
-
-The planned dashboard will provide a citywide overview with a trip validity filter, hourly weather, and a taxi zone map. Selecting a pickup zone will show destination zones colored by trip count and ranked in a table. Before importing the routes mart into Power BI, its size and connection strategy need to be checked: it contains about 29.5 million aggregated rows.
+The pipeline, dbt models, checks, GeoJSON map boundaries, and three-page Power BI Desktop report are complete. The routes mart contains about 29.5 million aggregated rows, so it is not a one-row-per-trip table. The report is not published to Power BI Service; the repository documentation and report preview are being prepared for portfolio use.

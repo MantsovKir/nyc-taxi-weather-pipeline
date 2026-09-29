@@ -1,30 +1,33 @@
-# NYC Taxi Weather dbt project
+# NYC Taxi & Weather dbt models
 
-This scaffold organizes transformations of the raw NYC taxi and weather data in ClickHouse. No SQL models have been added yet.
+This dbt project transforms raw NYC Yellow Taxi records and Open-Meteo hourly weather loaded by Sling into two ClickHouse marts used by the Power BI report. See the [root README](../README.md) for the data sources, architecture, results, and full setup.
 
-- `models/staging`: views that standardize raw source fields and types.
-- `models/intermediate`: views that prepare reusable joins and transformations.
-- `models/marts`: tables containing final datasets for analysis and reporting.
+## Model layers
 
-## Local setup
+| Layer | Models | Purpose |
+|---|---|---|
+| Staging | `stg_taxi_trips`, `stg_weather_hourly` | Standardize taxi fields and expand monthly weather JSON into hourly observations. |
+| Intermediate | `int_taxi_trips_clean`, `int_taxi_hourly` | Keep the analysis period, flag trip quality, and aggregate citywide trips by pickup hour. |
+| Marts | `mart_taxi_weather_hourly`, `mart_taxi_routes_hourly` | Supply hourly citywide weather metrics and hourly origin-destination route metrics. |
 
-Run these commands from the repository root with `dbt-clickhouse` available in the uv environment. Create a local profile copy only if one does not already exist:
+Staging and intermediate models are views. Both marts are ClickHouse `MergeTree` tables. The `taxi_zone_lookup` seed supplies pickup and dropoff zone names to the routes mart.
 
-```sh
+The citywide weather mart has one row per weather hour. The routes mart has one row per pickup hour, pickup zone, dropoff zone, and validity flag. Sum `trip_count` to count trips from route groups. `total_valid_amount` sums amounts for valid trips in each group.
+
+## Local commands
+
+From the repository root, copy the example profile and load the local ClickHouse credentials from `.env` into the shell. The profile reads `CLICKHOUSE_DB`, `CLICKHOUSE_USER`, and `CLICKHOUSE_PASSWORD` from environment variables; dbt does not automatically read `.env`.
+
+```bash
 cp -n dbt/profiles.yml.example dbt/profiles.yml
-```
-
-Set `CLICKHOUSE_DB`, `CLICKHOUSE_USER`, and `CLICKHOUSE_PASSWORD` in your shell environment before running dbt. The profile's `schema` selects the ClickHouse database. dbt does not automatically load the repository's `.env` file.
-
-`profiles.yml.example` must never contain real secrets; keep its environment-variable references. Keep credentials out of committed files and retain those references in your local profile too. The commands below use the local profile explicitly and do not require `~/.dbt/profiles.yml`.
-
-```sh
+set -a
+. ./.env
+set +a
+uv sync --locked
 uv run dbt debug --project-dir dbt --profiles-dir dbt
-uv run dbt parse --project-dir dbt --profiles-dir dbt
+uv run dbt seed --project-dir dbt --profiles-dir dbt --select taxi_zone_lookup
+uv run dbt build --project-dir dbt --profiles-dir dbt \
+  --select +mart_taxi_weather_hourly +mart_taxi_routes_hourly
 ```
 
-After SQL models and tests have been added, build them with:
-
-```sh
-uv run dbt build --project-dir dbt --profiles-dir dbt
-```
+The build runs model and data tests. Tests include required and accepted values, uniqueness of weather hours and route keys, and consistency checks for hourly taxi metrics. Raw data must be loaded first using the steps in the root README. Keep the local `dbt/profiles.yml` and `.env` files out of Git.
