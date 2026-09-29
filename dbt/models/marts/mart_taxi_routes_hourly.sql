@@ -11,7 +11,8 @@ WITH taxi_trips AS (
         pickup_hour,
         pickup_location_id,
         dropoff_location_id,
-        is_valid_trip
+        is_valid_trip,
+        total_amount
     from {{ ref('int_taxi_trips_clean') }}
 ),
 route_counts AS(
@@ -20,7 +21,8 @@ SELECT
     pickup_location_id,
     dropoff_location_id,
     is_valid_trip,
-    count() AS trip_count
+    count() AS trip_count,
+    sumIf(ifNull(total_amount, 0), is_valid_trip = 1) AS total_valid_amount
 FROM taxi_trips
 GROUP BY
     pickup_hour,
